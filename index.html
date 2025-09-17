@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Island Erosion Simulation</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; padding: 16px; }
+    .card { background-color: #d0e7ff; border-radius: 8px; padding: 16px; display: flex; justify-content: center; align-items: center; height: 400px; }
+    .controls { background-color: #fff; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    select, button { padding: 6px; font-size: 14px; }
+    .island { background-color: #2d6a4f; border-radius: 50%; transition: width 0.25s linear, height 0.25s linear; }
+    .message { color: red; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function IslandErosionSimulation() {
+      const [isRunning, setIsRunning] = useState(false);
+      const [islandType, setIslandType] = useState("volcanic-explosive");
+      const [rainfall, setRainfall] = useState("moderate");
+      const [rainPH, setRainPH] = useState("normal");
+      const [windspeed, setWindspeed] = useState("moderate");
+      const [storms, setStorms] = useState("some");
+      const [biomass, setBiomass] = useState("medium");
+      const [islandArea, setIslandArea] = useState(100);
+      const [timeElapsed, setTimeElapsed] = useState(0);
+      const [message, setMessage] = useState("");
+      const simSpeed = 250000;
+
+      const intervalRef = useRef(null);
+
+      const erosionParameters = {
+        "volcanic-explosive": { BRE: 0.0000000089, BWWE: 0.0000000067, BSE: 0.0000000044, BBE: 0.0000000022, pH: { normal: 1, acid: 1.7 } },
+        "volcanic-shield": { BRE: 0.0000000027, BWWE: 0.000000002, BSE: 0.0000000017, BBE: 0.000000001, pH: { normal: 1, acid: 1.6 } },
+        "continental-crystalline": { BRE: 0.000000000667, BWWE: 0.000000000533, BSE: 0.000000000333, BBE: 0.0000000002, pH: { normal: 1, acid: 1.3 } },
+        "continental-mixed": { BRE: 0.0000000016, BWWE: 0.00000000128, BSE: 0.0000000008, BBE: 0.0000000004, pH: { normal: 1, acid: 1.45 } },
+        "continental-sedimentary": { BRE: 0.00000002, BWWE: 0.000000015, BSE: 0.00000001, BBE: 0.000000005, pH: { normal: 1, acid: 2.0 } }
+      };
+
+      const multipliers = {
+        rainfall: { light: 0.5, moderate: 1, heavy: 1.55 },
+        wind: { low: 0.6, moderate: 1, high: 1.5 },
+        storm: { rare: 0.5, some: 1, frequent: 2.5 },
+        biomass: { low: 1.1, medium: 1, high: 0.65 }
+      };
+
+      const calculateTotalErosion = () => {
+        const params = erosionParameters[islandType];
+        const RE = params.BRE * multipliers.rainfall[rainfall] * params.pH[rainPH];
+        const WWE = params.BWWE * multipliers.wind[windspeed];
+        const SE = params.BSE * multipliers.storm[storms];
+        const BE = params.BBE * multipliers.biomass[biomass];
+        return RE + WWE + SE + BE;
+      };
+
+      useEffect(() => {
+        if (isRunning && islandArea > 0) {
+          intervalRef.current = setInterval(() => {
+            const erosion = calculateTotalErosion();
+            const visualFactor = islandType === "continental-sedimentary" ? 400 : 3000;
+
+            setIslandArea(prev => {
+              const newArea = Math.max(prev - erosion * simSpeed / 4 * visualFactor, 0);
+              if (newArea === 0) {
+                setIsRunning(false);
+                setMessage("Your island is completely submerged.");
+              }
+              return newArea;
+            });
+
+            setTimeElapsed(prev => prev + simSpeed / 4);
+          }, 250);
+        } else {
+          clearInterval(intervalRef.current);
+        }
+        return () => clearInterval(intervalRef.current);
+      }, [isRunning, islandType, rainfall, rainPH, windspeed, storms, biomass, islandArea]);
+
+      const resetSimulation = () => {
+        setIslandArea(100);
+        setTimeElapsed(0);
+        setMessage("");
+      };
+
+      return (
+        <div className="grid">
+          <div className="card">
+            <div className="island" style={{ width: `${islandArea * 3}px`, height: `${islandArea * 3}px` }}></div>
+          </div>
+
+          <div className="controls">
+            <label>Island Type</label>
+            <select onChange={e => setIslandType(e.target.value)} value={islandType} disabled={isRunning}>
+              <option value="volcanic-explosive">Volcanic - Explosive</option>
+              <option value="volcanic-shield">Volcanic - Shield</option>
+              <option value="continental-crystalline">Continental - Crystalline</option>
+              <option value="continental-mixed">Continental - Mixed</option>
+              <option value="continental-sedimentary">Continental - Sedimentary</option>
+            </select>
+
+            <label>Climate (Rainfall)</label>
+            <select onChange={e => setRainfall(e.target.value)} value={rainfall}>
+              <option value="light">Dry- 65 to 300 cm/year</option>
+              <option value="moderate">Temperate- 301 to 650 cm/year</option>
+              <option value="heavy">Wet- 650 cm/year or more</option>
+            </select>
+
+            <label>Average Windspeed</label>
+            <select onChange={e => setWindspeed(e.target.value)} value={windspeed}>
+              <option value="low">Low (0 to 32 km/hour)</option>
+              <option value="moderate">Moderate (33 to 64 km/hour)</option>
+              <option value="high">High (65 km/hour or more)</option>
+            </select>
+
+            <label>Average Rain pH</label>
+            <select onChange={e => setRainPH(e.target.value)} value={rainPH}>
+              <option value="normal">Normal</option>
+              <option value="acid">Acid Rain</option>
+            </select>
+
+            <label>Weather Patterns</label>
+            <select onChange={e => setStorms(e.target.value)} value={storms}>
+              <option value="rare">Mild; infrequent storms</option>
+              <option value="some">Moderate; regular storms, sometimes severe</option>
+              <option value="frequent">Severe; frequent storms, often severe</option>
+            </select>
+
+            <label>Biomass</label>
+            <select onChange={e => setBiomass(e.target.value)} value={biomass}>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+        </select>
+
+            <div>
+              <button onClick={() => setIsRunning(!isRunning)}>{isRunning ? "Pause" : "Start"}</button>
+              <button onClick={resetSimulation} disabled={isRunning}>Reset</button>
+            </div>
+
+            <div>
+              <p><strong>Island Area:</strong> {islandArea.toFixed(2)}%</p>
+              <p><strong>Time Elapsed:</strong> {timeElapsed.toLocaleString()} years</p>
+              <p><strong>Simulation Speed:</strong> 250,000 years/sec</p>
+              {message && <p className="message">{message}</p>}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<IslandErosionSimulation />, document.getElementById('root'));
+  </script>
+</body>
+</html>
